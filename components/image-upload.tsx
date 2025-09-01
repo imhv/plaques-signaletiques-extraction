@@ -1,71 +1,83 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
-import { useDropzone } from "react-dropzone"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Upload, X, ImageIcon } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Upload, X, ImageIcon } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { validateImageFile, formatFileSize } from "@/lib/utils";
 
 interface UploadedImage {
-  id: string
-  filename: string
-  originalFilename: string
-  storagePath: string
-  fileSize: number
-  mimeType: string
-  uploadedAt: string
+  id: string;
+  filename: string;
+  originalFilename: string;
+  storagePath: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
 }
 
 interface ImageUploadProps {
-  onUploadComplete?: (images: UploadedImage[]) => void
-  maxFiles?: number
-  maxFileSize?: number // in bytes
+  onUploadComplete?: (images: UploadedImage[]) => void;
+  maxFiles?: number;
+  maxFileSize?: number; // in bytes
 }
 
 export function ImageUpload({
   onUploadComplete,
   maxFiles = 10,
-  maxFileSize = 10 * 1024 * 1024, // 10MB default
+  maxFileSize = 1024 * 1024, // 1MB default
 }: ImageUploadProps) {
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient()
+  const supabase = createClient();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return
+      if (acceptedFiles.length === 0) return;
 
-      setUploading(true)
-      setError(null)
-      setUploadProgress(0)
+      setUploading(true);
+      setError(null);
+      setUploadProgress(0);
 
       try {
         const {
           data: { user },
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser();
         if (!user) {
-          throw new Error("User not authenticated")
+          throw new Error("User not authenticated");
+        }
+
+        // Validate all files before uploading
+        for (const file of acceptedFiles) {
+          const validation = await validateImageFile(file);
+          if (!validation.valid) {
+            throw new Error(validation.error);
+          }
         }
 
         const uploadPromises = acceptedFiles.map(async (file, index) => {
           // Generate unique filename
-          const fileExt = file.name.split(".").pop()
-          const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+          const fileExt = file.name.split(".").pop();
+          const fileName = `${user.id}/${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2)}.${fileExt}`;
 
           // Upload to Supabase Storage
-          const { data: storageData, error: storageError } = await supabase.storage
-            .from("nameplate-images")
-            .upload(fileName, file, {
-              cacheControl: "3600",
-              upsert: false,
-            })
+          const { data: storageData, error: storageError } =
+            await supabase.storage
+              .from("nameplate-images")
+              .upload(fileName, file, {
+                cacheControl: "3600",
+                upsert: false,
+              });
 
-          if (storageError) throw storageError
+          if (storageError) throw storageError;
 
           // Save metadata to database
           const { data: imageData, error: dbError } = await supabase
@@ -79,18 +91,18 @@ export function ImageUpload({
               storage_path: storageData.path,
             })
             .select()
-            .single()
+            .single();
 
-          if (dbError) throw dbError
+          if (dbError) throw dbError;
 
           // Update progress
-          const progress = ((index + 1) / acceptedFiles.length) * 100
-          setUploadProgress(progress)
+          const progress = ((index + 1) / acceptedFiles.length) * 100;
+          setUploadProgress(progress);
 
-          return imageData
-        })
+          return imageData;
+        });
 
-        const results = await Promise.all(uploadPromises)
+        const results = await Promise.all(uploadPromises);
         const newImages = results.map((result) => ({
           id: result.id,
           filename: result.filename,
@@ -99,20 +111,20 @@ export function ImageUpload({
           fileSize: result.file_size,
           mimeType: result.mime_type,
           uploadedAt: result.uploaded_at,
-        }))
+        }));
 
-        setUploadedImages((prev) => [...prev, ...newImages])
-        onUploadComplete?.(newImages)
+        setUploadedImages((prev) => [...prev, ...newImages]);
+        onUploadComplete?.(newImages);
       } catch (err) {
-        console.error("Upload error:", err)
-        setError(err instanceof Error ? err.message : "Upload failed")
+        console.error("Upload error:", err);
+        setError(err instanceof Error ? err.message : "Upload failed");
       } finally {
-        setUploading(false)
-        setUploadProgress(0)
+        setUploading(false);
+        setUploadProgress(0);
       }
     },
-    [supabase, onUploadComplete],
-  )
+    [supabase, onUploadComplete]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -122,25 +134,27 @@ export function ImageUpload({
     maxFiles,
     maxSize: maxFileSize,
     disabled: uploading,
-  })
+  });
 
   const removeImage = async (imageId: string) => {
     try {
-      const imageToRemove = uploadedImages.find((img) => img.id === imageId)
-      if (!imageToRemove) return
+      const imageToRemove = uploadedImages.find((img) => img.id === imageId);
+      if (!imageToRemove) return;
 
       // Delete from storage
-      await supabase.storage.from("nameplate-images").remove([imageToRemove.storagePath])
+      await supabase.storage
+        .from("nameplate-images")
+        .remove([imageToRemove.storagePath]);
 
       // Delete from database
-      await supabase.from("images").delete().eq("id", imageId)
+      await supabase.from("images").delete().eq("id", imageId);
 
-      setUploadedImages((prev) => prev.filter((img) => img.id !== imageId))
+      setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
     } catch (err) {
-      console.error("Delete error:", err)
-      setError("Failed to delete image")
+      console.error("Delete error:", err);
+      setError("Failed to delete image");
     }
-  }
+  };
 
   return (
     <div className="space-y-4">
@@ -149,15 +163,22 @@ export function ImageUpload({
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+              isDragActive
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/25 hover:border-primary/50"
             } ${uploading ? "pointer-events-none opacity-50" : ""}`}
           >
             <input {...getInputProps()} />
             <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium mb-2">{isDragActive ? "Drop images here" : "Upload nameplate images"}</p>
-            <p className="text-sm text-muted-foreground mb-4">Drag and drop images here, or click to select files</p>
+            <p className="text-lg font-medium mb-2">
+              {isDragActive ? "Drop images here" : "Upload nameplate images"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Drag and drop images here, or click to select files
+            </p>
             <p className="text-xs text-muted-foreground">
-              Supports JPEG, PNG, WebP • Max {maxFiles} files • Max {Math.round(maxFileSize / 1024 / 1024)}MB each
+              Supports JPEG, PNG, WebP • Max {maxFiles} files • Max{" "}
+              {formatFileSize(maxFileSize)} each
             </p>
           </div>
 
@@ -165,7 +186,9 @@ export function ImageUpload({
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Uploading...</span>
-                <span className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</span>
+                <span className="text-sm text-muted-foreground">
+                  {Math.round(uploadProgress)}%
+                </span>
               </div>
               <Progress value={uploadProgress} className="w-full" />
             </div>
@@ -178,33 +201,6 @@ export function ImageUpload({
           )}
         </CardContent>
       </Card>
-
-      {uploadedImages.length > 0 && (
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-medium mb-4">Uploaded Images ({uploadedImages.length})</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {uploadedImages.map((image) => (
-                <div key={image.id} className="relative group">
-                  <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removeImage(image.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-2 truncate">{image.originalFilename}</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(image.fileSize / 1024)} KB</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
-  )
+  );
 }

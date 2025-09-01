@@ -1,29 +1,20 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const searchTerm = searchParams.get("searchTerm") || "";
+    const filterMethod = searchParams.get("filterMethod") || "all";
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const supabase = await createClient();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const page = Number.parseInt(searchParams.get("page") || "1")
-    const limit = Number.parseInt(searchParams.get("limit") || "20")
-    const offset = (page - 1) * limit
-
-    // Get predictions with image data
-    const { data: predictions, error } = await supabase
+    let query = supabase
       .from("predictions")
-      .select(`
+      .select(
+        `
         *,
         images (
           id,
@@ -31,35 +22,113 @@ export async function GET(request: NextRequest) {
           storage_path,
           uploaded_at
         )
-      `)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1)
+      `
+      )
+      .order("created_at", { ascending: false });
+
+    // Appliquer les filtres
+    if (filterMethod && filterMethod !== "all") {
+      query = query.eq("processing_method", filterMethod);
+    }
+
+    // Pagination
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: predictions, error } = await query;
 
     if (error) {
-      throw error
+      return NextResponse.json(
+        { error: `Failed to fetch predictions: ${error.message}` },
+        { status: 500 }
+      );
     }
 
     // Get total count for pagination
-    const { count } = await supabase
+    let countQuery = supabase
       .from("predictions")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
+      .select("*", { count: "exact", head: true });
+
+    if (filterMethod && filterMethod !== "all") {
+      countQuery = countQuery.eq("processing_method", filterMethod);
+    }
+
+    const { count } = await countQuery;
+
+    // Filtrer par terme de recherche côté serveur
+    let filteredPredictions = predictions || [];
+    if (searchTerm) {
+      filteredPredictions = filteredPredictions.filter((prediction) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          prediction.images.original_filename
+            .toLowerCase()
+            .includes(searchLower) ||
+          prediction.brand?.toLowerCase().includes(searchLower) ||
+          prediction.model_number?.toLowerCase().includes(searchLower) ||
+          prediction.product_family?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
 
     return NextResponse.json({
-      predictions: predictions || [],
+      predictions: filteredPredictions,
       pagination: {
         page,
         limit,
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit),
       },
-    })
+    });
   } catch (error) {
-    console.error("Get predictions API error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 },
-    )
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const predictionId = searchParams.get("id");
+
+    if (!predictionId) {
+      return NextResponse.json(
+        { error: "Prediction ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { error } = await supabase
+      .from("predictions")
+      .delete()
+      .eq("id", predictionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      return NextResponse.json(
+        { error: `Failed to delete prediction: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
