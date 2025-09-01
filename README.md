@@ -94,15 +94,29 @@ Tests réalisés :
   - Retry logic intégré
   - Streaming et structured outputs
 
+### **3. Stack Supabase (Backend as a Service)**
+
+- **Pourquoi** : Solution centralisée et rapide à mettre en place
+- **Composants** :
+  - **Storage S3** : Stockage des fichiers images dans le cloud AWS via Supabase
+  - **Authentication** : Gestion complète des utilisateurs (inscription, connexion, sessions)
+  - **Base de données** : Tables `images` et `predictions` pour stocker les résultats avec ORM intégré
+- **Avantages** :
+  - **Centralisation** : Tout le backend en une seule plateforme
+  - **Rapidité** : Mise en place très rapide sans configuration complexe
+  - **Scalabilité** : Infrastructure AWS sous-jacente
+  - **Sécurité** : RLS (Row Level Security) intégré
+  - **API automatique** : Endpoints REST générés automatiquement (ORM)
+
 ## 🔄 Pipeline d'Extraction
 
 ### Étapes du Pipeline
 
-1. **Upload d'Image** → Supabase Storage
+1. **Upload d'Image** → Supabase Storage (S3 AWS)
 2. **Génération URL Signée** → Accès sécurisé à l'image
 3. **Extraction LLM** → GPT-4o-mini avec prompt spécialisé
 4. **Post-traitement** → Normalisation et validation
-5. **Sauvegarde** → Base de données avec métadonnées
+5. **Sauvegarde** → Tables Supabase (`images` + `predictions`)
 
 ### Architecture Modulaire
 
