@@ -87,7 +87,8 @@ const rateLimiter = new RateLimiter();
 
 export async function extractWithLLM(
   imageUrl: string,
-  retryCount = 0
+  retryCount = 0,
+  model = "gpt-5"
 ): Promise<ExtractionResult> {
   const maxRetries = 3;
   const baseDelay = 2000; // 2 secondes
@@ -99,8 +100,10 @@ export async function extractWithLLM(
     // Attendre si nécessaire pour respecter les limites
     await rateLimiter.waitIfNeeded();
 
+    console.log(`🤖 Using model: ${model}`);
+
     const result = await generateObject({
-      model: openai("gpt-5-mini"),
+      model: openai(model),
       messages: [
         {
           role: "user",
@@ -158,7 +161,7 @@ export async function extractWithLLM(
         }/${maxRetries})`
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
-      return extractWithLLM(imageUrl, retryCount + 1);
+      return extractWithLLM(imageUrl, retryCount + 1, model);
     }
 
     throw error;
@@ -166,43 +169,44 @@ export async function extractWithLLM(
 }
 
 function buildExtractionPrompt(): string {
-  return `Analysez cette image de plaque signalétique d'appareil électroménager et extrayez les informations suivantes.
+  return `Analysez cette image de plaque signalétique d'appareil électroménager et extrayez les informations suivantes. Dans le but d'identifier l'appareil électroménager pour donner par la suite des recommandations sur le produit.
 
-    **INFORMATIONS À EXTRAIRE :**
-1. **Marque/Fabricant** - Recherchez les noms d'entreprises comme Whirlpool, Samsung, LG, Bosch, Miele, etc.
-2. **Famille de produit/Type** - Le champ le plus important. Recherchez les termes qui indiquent le type d'appareil
-3. **Numéro de modèle** - Généralement une combinaison de lettres et de chiffres. souvent après modèle, model, type..
-4. **Numéro de série** - Identifiant unique, souvent plus long que les numéros de modèle. souvent après nr, serial, serial number, serial#
+**INFORMATIONS À EXTRAIRE :**
 
-**RÈGLES D'EXTRACTION DES FAMILLES DE PRODUITS : **
-exemple : REFRIGERATEUR, CONGELATEUR, REFRIGERATEUR CONGELATEUR, LAVE-LINGE, SECHE-LINGE, LAVE-VAISSELLE, PLAQUE INDUCTION, FOUR, CUISINIERE, MICRO-ONDES, CAVE A VINS...
-Attention le peut etre dans une autre langue toujours la donner en FRANCAIS comme ci desssus.
+1. 🏷️ **MARQUE/FABRICANT**
+   • Recherchez les noms de marques d'électroménager
+   • Exemples : WHIRLPOOL, SAMSUNG, LG, BOSCH, MIELE, SIEMENS, ELECTROLUX, etc.
+   • Format de sortie : TOUJOURS EN MAJUSCULES
 
+2. 📱 **FAMILLE DE PRODUIT/TYPE** 
+   • Identifiez le type d'appareil électroménager écrit sur la plaque ou le produit en lui même car la plaque est sur l'objet
+   • Exemples français requis a recopier exactement sans modification :
+     - REFRIGERATEUR | CONGELATEUR | REFRIGERATEUR CONGELATEUR
+     - LAVE-LINGE | SECHE-LINGE 
+     - LAVE-VAISSELLE | PLAQUE INDUCTION | FOUR | CUISINIERE
+     • MICRO-ONDES | CAVE A VINS 
+   • ⚠️ IMPORTANT : Si le texte est dans une autre langue, traduisez TOUJOURS en français
+   • Format de sortie : TOUJOURS EN MAJUSCULES ET EN FRANÇAIS
 
-**RÈGLES SPÉCIALES POUR LES NUMÉROS DE SÉRIE :**
-1. **Longueur typique** - Généralement 8-20 caractères
-2. **Format courant** - Souvent tout en chiffres ou mélange lettres/chiffres
-3. **Attention aux erreurs courantes** :
-   - Ne pas tronquer les numéros longs
-   - Ne pas ajouter des chiffres qui ne sont pas là
-   - N'écris pas sn, serial number, serial# mais le numéro de série lui meme
+3. 🔢 **NUMÉRO DE MODÈLE**
+   • Combinaison alphanumérique identifiant le modèle
+   • Mots-clés à rechercher : "Modèle", "Model", "Type", "Mod.", "Typ."
+   • Exemples : MO32ECSLCROUSTY, F854G63WR, MTWA91483WFR, W614, WTB86500FF, CIS6699BPW
+   • Format de sortie : Tel qu'écrit sur la plaque (respecter majuscules/minuscules)
 
-**RÈGLES DE TRANSCRIPTION CRITIQUES :**
-1. **Caractères similaires** - Faites très attention à :
-   - O (lettre) vs 0 (zéro) - Dans les codes, souvent des zéros
-   - I (lettre) vs 1 (un) - Dans les codes, souvent des uns
-   - S vs 5, G vs 6, B vs 8
-   - Vérifiez le contexte : les numéros de série sont souvent tout en chiffres
-2. **Précision absolue** - Recopiez EXACTEMENT ce que vous voyez, caractère par caractère
-3. **Double vérification** - Relisez chaque caractère individuellement
+4. 🆔 **NUMÉRO DE SÉRIE**
+   • Identifiant unique de l'appareil (généralement plus long que le modèle)
+   • Mots-clés à rechercher : "S/N", "SN", "Serial", "Serial Number", "N° Série", "FD"
+   • Exemples : 16070000065619, 710PNXL0B738, 562208000274, 9305201359
+   • ⚠️ IMPORTANT : N'incluez PAS les préfixes (sn, serial, etc.) - UNIQUEMENT le numéro
 
 **SCORES DE CONFIANCE :**
-- **0.9-1.0** : Texte très clair, parfaitement lisible
-- **0.7-0.8** : Texte lisible avec quelques incertitudes mineures
-- **0.5-0.6** : Texte partiellement lisible, quelques caractères incertains
-- **0.3-0.4** : Texte difficile à lire, plusieurs caractères incertains
-- **0.1-0.2** : Texte très flou, extraction incertaine
-- **0.0** : Impossible à lire ou pas trouvé
+- **0.9-1.0** : Très lisible
+- **0.7-0.8** : Lisible
+- **0.5-0.6** : Partiellement lisible
+- **0.3-0.4** : Difficile à lire
+- **0.1-0.2** : Très flou
+- **0.0** : Illisible ou absent
 
 **IMPORTANT :** 
 1. N'inventez JAMAIS de données - mieux vaut NOT_FOUND qu'une erreur

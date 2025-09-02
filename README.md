@@ -51,16 +51,22 @@ pnpm start
 
 ### (page /) Vérifier via upload
 
+<img src="./public/screenshots/upload.png" alt="Interface d'upload" width="700">
+
 1. Uploadez une image de plaque signalétique
 2. Consultez les résultats extraits
 
 ### (page /extractions) Liste de vos uploads avec les résultats
+
+<img src="./public/screenshots/list.png" alt="Liste des extractions" width="700">
 
 1. Consultez l'historique de vos extractions
 2. Visualisez les images et données extraites
 3. Exportez les résultats si nécessaire
 
 ### (page /test-zone) Lancer des tests automatisés aléatoires sur la base des 100 plaques communiquées
+
+<img src="./public/screenshots/test.png" alt="Zone de test" width="700">
 
 1. Donnez un nom à votre test
 2. Définissez le nombre d'images à tester
@@ -77,14 +83,13 @@ Tests réalisés :
 - Préformatage image / LLM : amélioration limitée
 - LLM seul : meilleure performance
 
-### **1. Vision LLM (GPT-4o-mini)**
+### **1. Vision LLM**
 
 - **Pourquoi** : Performance supérieure à l'OCR traditionnel
 - **Avantages** :
   - Compréhension contextuelle des plaques signalétiques
   - Gestion multilingue native (FR, EN, ES, IT)
   - Extraction directe sans étape intermédiaire OCR
-- **Coût** : Optimisé avec GPT-4o-mini pour équilibrer performance/coût
 
 ### **2. AI SDK (Vercel)**
 
@@ -114,7 +119,7 @@ Tests réalisés :
 
 1. **Upload d'Image** → Supabase Storage (S3 AWS)
 2. **Génération URL Signée** → Accès sécurisé à l'image
-3. **Extraction LLM** → GPT-4o-mini avec prompt spécialisé
+3. **Extraction LLM** → GPT-5 avec prompt spécialisé
 4. **Post-traitement** → Normalisation et validation
 5. **Sauvegarde** → Tables Supabase (`images` + `predictions`)
 
@@ -142,7 +147,7 @@ lib/extraction/
 
 ### Métriques de Performance
 
-- **Temps de traitement** : ~15 secondes par image (dépend du modèle choisi et des serveurs du LLM)
+- **Temps de traitement** : ~20 secondes par image (dépend du modèle choisi et des serveurs du LLM)
 - **Taux de succès attendu** : > 85% des lisibles
 - **Gestion d'erreurs** : Retry automatique + fallbacks
 
@@ -152,7 +157,7 @@ lib/extraction/
 
 1. **Qualité d'image** : Performance dégradée sur images floues/illisibles
 2. **Rate limits API** : 450 RPM maximum (géré automatiquement)
-3. **Taille d'image** : Limite 1MB pour les uploads (peut être largement augmentée avec une version payante)
+3. **Taille d'image** : Limite 1MB pour les uploads (peut être largement augmentée avec une version payante OCR)
 
 ### Cas d'Échec Identifiés
 

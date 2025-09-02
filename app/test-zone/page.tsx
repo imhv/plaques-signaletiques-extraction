@@ -14,6 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import {
   Play,
@@ -75,6 +82,7 @@ export default function EvaluationPage() {
   const [sampleSize, setSampleSize] = useState(5);
   const [batchSize, setBatchSize] = useState(5);
   const [useFullParallel, setUseFullParallel] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("gpt-5-mini");
   // const [enableComparison, setEnableComparison] = useState(false); // Désactivé
   // const [enablePreprocessing, setEnablePreprocessing] = useState(true); // Désactivé
   const [isRunning, setIsRunning] = useState(false);
@@ -120,6 +128,7 @@ export default function EvaluationPage() {
         body: JSON.stringify({
           imageId: imageId,
           method: "llm",
+          model: selectedModel,
           // preprocess: enablePreprocessing, // Désactivé
         }),
       });
@@ -594,6 +603,23 @@ export default function EvaluationPage() {
                 <p className="text-xs text-muted-foreground">
                   Number of images processed simultaneously (higher = faster but
                   may overload API)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="model-select">LLM Model</Label>
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                    <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
+                    <SelectItem value="gpt-5">GPT-5</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose the LLM model for extraction (5-mini is default)
                 </p>
               </div>
 

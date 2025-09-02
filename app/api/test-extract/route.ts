@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageId, method = "llm" } = body;
+    const { imageId, method = "llm", model = "gpt-5" } = body;
     // const preprocess = true; // Désactivé
 
     console.log(`Test extraction requested for image: ${imageId}`);
@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
         mime_type: "image/jpeg",
         user_id: "test-user",
       },
-      method
+      method,
+      model
     );
 
     // Générer l'URL publique de l'image pour l'affichage

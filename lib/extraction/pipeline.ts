@@ -19,6 +19,7 @@ export interface ProcessOptions {
   method?: "llm";
   force?: boolean;
   testMode?: boolean;
+  model?: string;
   // preprocess?: boolean; // Désactivé - prétraitement retiré
 }
 
@@ -32,6 +33,7 @@ export async function uploadAndExtract(
     method = "llm",
     force = false,
     testMode = false,
+    model = "gpt-5",
     // preprocess = true, // Désactivé
   } = processOptions;
 
@@ -63,7 +65,7 @@ export async function uploadAndExtract(
     user_id: userId,
   };
 
-  const result = await processImage(imageData, method);
+  const result = await processImage(imageData, method, model);
 
   // 4. Sauvegarder le résultat (sauf en mode test)
   if (!testMode) {
@@ -168,7 +170,8 @@ function formatPredictionResult(prediction: any): ExtractionResult {
 
 export async function processImage(
   imageData: ImageData,
-  method: "llm" = "llm"
+  method: "llm" = "llm",
+  model: string = "gpt-5"
 ): Promise<ExtractionResult> {
   const startTime = Date.now();
 
@@ -209,7 +212,7 @@ export async function processImage(
     const imageToProcess = imageUrl;
 
     // Utiliser la fonction d'extraction LLM
-    const result = await extractWithLLM(imageToProcess);
+    const result = await extractWithLLM(imageToProcess, 0, model);
 
     // Calculer le temps de traitement total
     const totalProcessingTime = Date.now() - startTime;
