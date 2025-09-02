@@ -82,7 +82,7 @@ export default function EvaluationPage() {
   const [sampleSize, setSampleSize] = useState(5);
   const [batchSize, setBatchSize] = useState(5);
   const [useFullParallel, setUseFullParallel] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("gpt-5-mini");
+  const [selectedModel, setSelectedModel] = useState("gpt-5");
   // const [enableComparison, setEnableComparison] = useState(false); // Désactivé
   // const [enablePreprocessing, setEnablePreprocessing] = useState(true); // Désactivé
   const [isRunning, setIsRunning] = useState(false);
